@@ -28,7 +28,7 @@
 
       in rec {
         packages.default = pkgs.haskellPackages.encounter-difficulty;
-
+        defaultPackage = pkgs.haskellPackages.encounter-difficulty;
         apps.default = {
           type = "app";
 
