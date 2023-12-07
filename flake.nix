@@ -1,41 +1,36 @@
 {
   description = "Haskell D&D utility to find encounter difficulties";
-  inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+  inputs = { nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable"; };
 
-    utils.url = "github:numtide/flake-utils";
-  };
+  outputs = { nixpkgs, ... }:
+    let
+      overlay = pkgsNew: pkgsOld: {
+        encounter-difficulty = pkgsNew.haskell.lib.justStaticExecutables
+          pkgsNew.haskellPackages.encounter-difficulty;
 
-  outputs = { nixpkgs, utils, ... }:
-    utils.lib.eachDefaultSystem (system:
-      let
-        config = { };
+        haskellPackages = pkgsOld.haskellPackages.override (old: {
+          overrides = pkgsNew.haskell.lib.packageSourceOverrides {
+            encounter-difficulty = ./.;
+          };
+        });
+      };
+      forAllSystems = function:
+        nixpkgs.lib.genAttrs [ "x86_64-linux" "aarch64-linux" ] (system:
+          function (import nixpkgs {
+            inherit system;
+            overlays = [ overlay ];
+          }));
 
-        overlay = pkgsNew: pkgsOld: {
-          encounter-difficulty = pkgsNew.haskell.lib.justStaticExecutables
-            pkgsNew.haskellPackages.encounter-difficulty;
+    in rec {
+      packages = forAllSystems
+        (pkgs: { default = pkgs.haskellPackages.encounter-difficulty; });
+      apps.default = {
+        type = "app";
 
-          haskellPackages = pkgsOld.haskellPackages.override (old: {
-            overrides = pkgsNew.haskell.lib.packageSourceOverrides {
-              encounter-difficulty = ./.;
-            };
-          });
-        };
+        program =
+          "${nixpkgs.pkgs.encounter-difficulty}/bin/encounter-difficulty";
+      };
 
-        pkgs = import nixpkgs {
-          inherit config system;
-          overlays = [ overlay ];
-        };
-
-      in rec {
-        packages.default = pkgs.haskellPackages.encounter-difficulty;
-        defaultPackage = pkgs.haskellPackages.encounter-difficulty;
-        apps.default = {
-          type = "app";
-
-          program = "${pkgs.encounter-difficulty}/bin/encounter-difficulty";
-        };
-
-        devShells.default = pkgs.haskellPackages.encounter-difficulty.env;
-      });
+      devShells.default = nixpkgs.haskellPackages.encounter-difficulty.env;
+    };
 }
