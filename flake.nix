@@ -1,44 +1,60 @@
-# SPDX-FileCopyrightText: 2021 Serokell <https://serokell.io/>
-#
-# SPDX-License-Identifier: CC0-1.0
-
 {
-  description = "My haskell application";
-
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs";
-    flake-utils.url = "github:numtide/flake-utils";
+    nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
+    flake-parts.url = "github:hercules-ci/flake-parts";
+    haskell-flake.url = "github:srid/haskell-flake";
   };
+  outputs = inputs@{ self, nixpkgs, flake-parts, ... }:
+    flake-parts.lib.mkFlake { inherit inputs; } {
+      systems = nixpkgs.lib.systems.flakeExposed;
+      imports = [ inputs.haskell-flake.flakeModule ];
 
-  outputs = { self, nixpkgs, flake-utils }:
-    flake-utils.lib.eachSystem [ "x86_64-linux" ] (system:
-      let
-        pkgs = nixpkgs.legacyPackages.${system};
+      perSystem = { self', pkgs, ... }: {
 
-        haskellPackages = pkgs.haskellPackages;
+        # Typically, you just want a single project named "default". But
+        # multiple projects are also possible, each using different GHC version.
+        haskellProjects.default = {
+          # The base package set representing a specific GHC version.
+          # By default, this is pkgs.haskellPackages.
+          # You may also create your own. See https://community.flake.parts/haskell-flake/package-set
+          # basePackages = pkgs.haskellPackages;
 
-        jailbreakUnbreak = pkg:
-          pkgs.haskell.lib.doJailbreak (pkg.overrideAttrs (_: { meta = { }; }));
+          # Extra package information. See https://community.flake.parts/haskell-flake/dependency
+          #
+          # Note that local packages are automatically included in `packages`
+          # (defined by `defaults.packages` option).
+          #
+          # packages = {
+          #   aeson.source = "1.5.0.0"; # Hackage version override
+          #   shower.source = inputs.shower;
+          # };
+          # settings = {
+          #   aeson = {
+          #     check = false;
+          #   };
+          #   relude = {
+          #     haddock = false;
+          #     broken = false;
+          #   };
+          # };
 
-        packageName = "encounter-difficulty";
-      in {
-        packages.${packageName} = haskellPackages.callCabal2nix packageName self
-          rec {
-            # Dependency overrides go here
+          devShell = {
+            # Enabled by default
+            enable = true;
+
+            # Programs you want to make available in the shell.
+            # Default programs can be disabled by setting to 'null'
+            tools = hp: {
+              fourmolu = hp.fourmolu;
+              ghcid = null;
+            };
+
+            hlsCheck.enable = true;
           };
-
-        packages.default = self.packages.${system}.${packageName};
-        defaultPackage = self.packages.${system}.default;
-
-        devShells.default = pkgs.mkShell {
-          buildInputs = with pkgs; [
-            haskellPackages.haskell-language-server # you must build it with your ghc to work
-            ghcid
-            cabal-install
-          ];
-          inputsFrom =
-            map (__getAttr "env") (__attrValues self.packages.${system});
         };
-        devShell = self.devShells.${system}.default;
-      });
+
+        # haskell-flake doesn't set the default package, but you can do it here.
+        packages.default = self'.packages.encounter-difficulty;
+      };
+    };
 }
