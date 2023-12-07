@@ -1,36 +1,44 @@
+# SPDX-FileCopyrightText: 2021 Serokell <https://serokell.io/>
+#
+# SPDX-License-Identifier: CC0-1.0
+
 {
-  description = "Haskell D&D utility to find encounter difficulties";
-  inputs = { nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable"; };
+  description = "My haskell application";
 
-  outputs = { nixpkgs, ... }:
-    let
-      overlay = pkgsNew: pkgsOld: {
-        encounter-difficulty = pkgsNew.haskell.lib.justStaticExecutables
-          pkgsNew.haskellPackages.encounter-difficulty;
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs";
+    flake-utils.url = "github:numtide/flake-utils";
+  };
 
-        haskellPackages = pkgsOld.haskellPackages.override (old: {
-          overrides = pkgsNew.haskell.lib.packageSourceOverrides {
-            encounter-difficulty = ./.;
+  outputs = { self, nixpkgs, flake-utils }:
+    flake-utils.lib.eachDefaultSystem (system:
+      let
+        pkgs = nixpkgs.legacyPackages.${system};
+
+        haskellPackages = pkgs.haskellPackages;
+
+        jailbreakUnbreak = pkg:
+          pkgs.haskell.lib.doJailbreak (pkg.overrideAttrs (_: { meta = { }; }));
+
+        packageName = "encounter-difficulty";
+      in {
+        packages.${packageName} = haskellPackages.callCabal2nix packageName self
+          rec {
+            # Dependency overrides go here
           };
-        });
-      };
-      forAllSystems = function:
-        nixpkgs.lib.genAttrs [ "x86_64-linux" "aarch64-linux" ] (system:
-          function (import nixpkgs {
-            inherit system;
-            overlays = [ overlay ];
-          }));
 
-    in rec {
-      packages = forAllSystems
-        (pkgs: { default = pkgs.haskellPackages.encounter-difficulty; });
-      apps.default = {
-        type = "app";
+        packages.default = self.packages.${system}.${packageName};
+        defaultPackage = self.packages.${system}.default;
 
-        program =
-          "${nixpkgs.pkgs.encounter-difficulty}/bin/encounter-difficulty";
-      };
-
-      devShells.default = nixpkgs.haskellPackages.encounter-difficulty.env;
-    };
+        devShells.default = pkgs.mkShell {
+          buildInputs = with pkgs; [
+            haskellPackages.haskell-language-server # you must build it with your ghc to work
+            ghcid
+            cabal-install
+          ];
+          inputsFrom =
+            map (__getAttr "env") (__attrValues self.packages.${system});
+        };
+        devShell = self.devShells.${system}.default;
+      });
 }
