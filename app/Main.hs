@@ -9,9 +9,6 @@ main = do
   let numbers = map read userInput :: [Integer]
   print $ foldr (addCharacters . toCharacter) (Character 0 0 0 0 ) numbers
 
-
-data Difficulty = Easy | Medium | Hard | Deadly deriving (Enum, Show)
-
 data Character = Character
   { easy   :: Integer
   , medium :: Integer
