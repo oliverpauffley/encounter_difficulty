@@ -1,4 +1,3 @@
-{-# LANGUAGE InstanceSigs #-}
 module Main where
 
 import           System.Environment
@@ -17,7 +16,6 @@ data Character = Character
   }
 
 instance Show Character where
-  show :: Character -> String
   show (Character a b c d) =
     "Easy: " ++ show a ++
     " Medium: " ++ show b ++
